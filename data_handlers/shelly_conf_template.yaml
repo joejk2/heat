@@ -1,0 +1,8 @@
+shelly: 
+    url: https://shelly-87-eu.shelly.cloud/device/status
+    token: "MWZmNzAxdWlkE4A1E3010480E247C108176AA4F36FCED448EAC3BFE60BCC8FA2E0936E0773BC6423BA2E9E8727B5"
+    device_ids: ["701878", "caaeb0"]
+
+local: 
+    data_dir: "/Users/jjk/data_local/twotontools/shelly_sensors"
+    archive_period_hours: 12
