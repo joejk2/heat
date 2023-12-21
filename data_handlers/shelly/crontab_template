@@ -1,0 +1,3 @@
+*/20 * * * * python <PATH>/heat/data_handlers/shelly/shelly_fetcher.py <PATH>/heat/data_handlers/shelly/shelly_conf.py 
+
+
