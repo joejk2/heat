@@ -55,7 +55,7 @@ def archive_data(data_dir, archive_period_hours):
     ]
     if (
         len(creation_times) == 0
-        or time.time() - max(creation_times) > archive_period_hours * 3600
+        or time.time() - max(creation_times) >= archive_period_hours * 3600
     ):
         shutil.copy2(
             "{}/log.csv".format(data_dir),
