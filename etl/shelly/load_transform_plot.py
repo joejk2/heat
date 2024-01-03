@@ -166,4 +166,4 @@ def main(shelly_log, meter_log):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(shelly_log=sys.argv[1], meter_log=sys.argv[2])
