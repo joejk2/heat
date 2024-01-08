@@ -6,6 +6,7 @@ import plotly.graph_objs
 
 
 def load_gas_data(meter_log):
+    # TODO: move function which shouldn't really be in etl/shelly
     return pd.read_csv(
         meter_log,
         names=["measured_at", "reading"],
@@ -17,7 +18,7 @@ def load_gas_data(meter_log):
     )
 
 
-def load_shelly_data(shelly_log):
+def load_data(shelly_log):
     return pd.read_csv(
         shelly_log,
         names=["device_id", "measured_at", "temperature", "humidity", "logged_at"],
@@ -32,7 +33,7 @@ def load_shelly_data(shelly_log):
     )
 
 
-def pivot_shelly_data_on_time(d):
+def pivot_on_time(d):
     # When generalised, will be a pivot on `time` and `home_id`
     d["logged_at_rounded"] = d["logged_at"].dt.floor("20T")
     d_internal = d[d["device_id"] == "701878"]
@@ -158,8 +159,8 @@ def plot(d_shelly, d_gas):
 
 
 def main(shelly_log, meter_log):
-    d_shelly = load_shelly_data(shelly_log)
-    d_shelly = pivot_shelly_data_on_time(d_shelly)
+    d_shelly = load_data(shelly_log)
+    d_shelly = pivot_on_time(d_shelly)
     d_shelly = add_degree_time_columns(d_shelly)
     d_gas = load_gas_data(meter_log)
     plot(d_shelly, d_gas)
