@@ -1,3 +1,3 @@
-*/20 * * * * python <PATH>/heat/etl/shelly/fetch.py <PATH>/heat/etl/shelly/conf.py 
+*/20 * * * * python3 <PATH>/heat/etl/shelly/fetch.py <PATH>/heat/etl/shelly/conf.yaml
 
 
