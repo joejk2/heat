@@ -69,9 +69,10 @@ def archive_data(data_dir, archive_period_hours):
 def main(conf_path):
     conf = from_yaml(conf_path)
 
-    for id in conf["shelly"]["device_ids"]:
-        data = fetch_data(conf["shelly"]["url"], conf["shelly"]["token"], id)
-        write_data(conf["local"]["data_dir"], data)
+    for home in conf["shelly"]:
+        for id in home["device_ids"]:
+            data = fetch_data(home["url"], home["token"], id)
+            write_data(conf["local"]["data_dir"], data)
 
     archive_data(conf["local"]["data_dir"], conf["local"]["archive_period_hours"])
 

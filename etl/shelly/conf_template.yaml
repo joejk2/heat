@@ -1,8 +1,13 @@
-shelly: 
-    url: https://shelly-87-eu.shelly.cloud/device/status
-    token: "MWZmNzAxdWlkE4A1E3010480E247C108176AA4F36FCED448EAC3BFE60BCC8FA2E0936E0773BC6423BA2E9E8727B5"
-    device_ids: ["701878", "caaeb0"]
+shelly:
+    - home: Joe
+      url: https://shelly-xx-eu.shelly.cloud/device/status
+      token: <TOKEN>
+      device_ids: [701878, caaeb0, edbc1f]
+    - home: Ed
+      url: https://shelly-xx-eu.shelly.cloud/device/status
+      token: <TOKEN>
+      device_ids: [ee5565, edbbff]
 
 local: 
-    data_dir: "/Users/jjk/data_local/twotontools/shelly_sensors"
+    data_dir: <PATH>/data_local/twotontools/shelly_sensors
     archive_period_hours: 12
