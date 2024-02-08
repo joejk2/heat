@@ -17,12 +17,7 @@ import sys
 import time
 
 import requests
-import yaml
-
-
-def from_yaml(path):
-    with open(path, "r") as file:
-        return yaml.load(file, Loader=yaml.FullLoader)
+from heat.common.utils import from_yaml
 
 
 def fetch_data(url, token, id):
