@@ -29,6 +29,7 @@ def fetch_data(url, token, id):
         tmp=device_status["tmp"]["value"],
         hum=device_status["hum"]["value"],
         read_time=datetime.datetime.now().replace(microsecond=0).isoformat(),
+        bat=device_status["bat"]["value"],
     )
 
 
@@ -38,8 +39,13 @@ def write_data(data_dir, d):
         "a",
     ) as f:
         f.write(
-            "{}, {}, {}, {}, {}\n".format(
-                d["id"], d["update_time"], d["tmp"], d["hum"], d["read_time"]
+            "{}, {}, {}, {}, {}, {}\n".format(
+                d["id"],
+                d["update_time"],
+                d["tmp"],
+                d["hum"],
+                d["read_time"],
+                d["bat"],
             )
         )
 

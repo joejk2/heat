@@ -4,18 +4,39 @@ import pandas as pd
 
 
 def load_data(shelly_log):
-    return pd.read_csv(
-        shelly_log,
-        names=["device_id", "measured_at", "temperature", "humidity", "logged_at"],
-        dtype=dict(
-            device_id="str",
-            measured_at="str",
-            temperature=float,
-            humidity=float,
-            logged_at="str",
-        ),
-        parse_dates=["measured_at", "logged_at"],
+    data = []
+    with open(shelly_log) as file:
+        for line in file:
+            values = line.strip().split(",")
+            if len(values) == 5:
+                values.append("nan")  # battery
+            data.append(values)
+
+    df = pd.DataFrame(
+        data,
+        columns=[
+            "device_id",
+            "measured_at",
+            "temperature",
+            "humidity",
+            "logged_at",
+            "battery",
+        ],
     )
+
+    dtypes = dict(
+        device_id=str,
+        measured_at="datetime64[ns]",
+        temperature=float,
+        humidity=float,
+        logged_at="datetime64[ns]",
+        battery=float,
+    )
+    df["measured_at"] = pd.to_datetime(df["measured_at"])
+    df["logged_at"] = pd.to_datetime(df["logged_at"])
+    df = df.astype(dtypes)
+
+    return df
 
 
 def pivot_on_time(d):
