@@ -1,3 +1,4 @@
+PYTHONPATH=/home/ec2-user/dev/
 */20 * * * * python3 <PATH>/heat/etl/shelly/fetch.py <PATH>/heat/etl/shelly/conf.yaml
 
 
