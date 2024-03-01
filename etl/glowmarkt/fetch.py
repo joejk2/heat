@@ -23,18 +23,24 @@ def get_token(username, password):
         "password": password,
     }
     response = requests.post(url, headers=HEADERS, json=data)
+    if "token" not in response.json():
+        raise ValueError(response.json())
     return response.json()["token"]
 
 
 def get_virtual_identify(token):
     url = f"{GLOWMARKT_API_URL}/virtualentity"
     response = requests.get(url, headers=dict(HEADERS, token=token))
+    if "veId" not in response.json()[0]:
+        raise ValueError(response.json())
     return response.json()[0]["veId"]
 
 
 def get_resources(veId, token):
     url = f"{GLOWMARKT_API_URL}/virtualentity/{veId}/resources?=null"
     response = requests.get(url, headers=dict(HEADERS, token=token))
+    if "resources" not in response.json():
+        raise ValueError(response.json())
     return {
         r["classifier"]: r["resourceId"]
         for r in response.json()["resources"]
@@ -48,6 +54,8 @@ def get_data_chunk(resourceId, token, start, end):
         f"?from={start}&to={end}&period=PT30M&function=sum&offset=0"
     )
     response = requests.get(url, headers=dict(HEADERS, token=token))
+    if "data" not in response.json():
+        raise ValueError(response.json())
     data = pd.DataFrame(response.json()["data"], columns=["timestamp", "kWh"])
     data["timestamp"] = pd.to_datetime(data["timestamp"], unit="s")
     return data.set_index("timestamp")
