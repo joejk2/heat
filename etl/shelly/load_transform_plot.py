@@ -1,8 +1,9 @@
 import sys
 
 import pandas as pd
-import plotly.subplots
 import plotly.graph_objs
+import plotly.subplots
+from heat.common.utils import from_yaml
 from heat.etl.shelly.utils import load_data, pivot_on_time
 
 
@@ -21,9 +22,7 @@ def load_gas_data(meter_log):
 
 def add_degree_time_columns(d):
     d_ext = d.copy(deep=True)
-    d_ext["cum_degree_days"] = (
-        d_ext["temperature_internal"] - d_ext["temperature_external"]
-    ).cumsum() / (
+    d_ext["cum_degree_days"] = (d_ext["temperature_diff_avg"]).cumsum() / (
         3 * 24  # logged every 20 minutes
     )
     d_ext["avg_degree_days"] = (
@@ -41,34 +40,38 @@ def plot(d_shelly, d_gas):
         row_heights=[0.5, 0.25, 0.25],
         subplot_titles=[
             "",
-            "Avg = {:.1f} °C".format(d_shelly["temperature_difference"].mean()),
+            "Avg = {:.1f} °C".format(d_shelly["temperature_diff_avg"].mean()),
             "",
         ],
         shared_xaxes=True,
         specs=[[{"secondary_y": True}]] * 3,
     )
+    for col in d_shelly.filter(regex=r"^temperature_int_"):
+        if col == "temperature_int_avg":
+            continue
+        f.add_trace(
+            plotly.graph_objs.Scatter(
+                x=d_shelly["logged_at_rounded"],
+                y=d_shelly[col],
+                name=col.replace("temperature_", ""),
+            ),
+            row=1,
+            col=1,
+        )
+    for col in d_shelly.filter(regex=r"^temperature_ext_"):
+        f.add_trace(
+            plotly.graph_objs.Scatter(
+                x=d_shelly["logged_at_rounded"],
+                y=d_shelly[col],
+                name=col.replace("temperature_", ""),
+            ),
+            row=1,
+            col=1,
+        )
     f.add_trace(
         plotly.graph_objs.Scatter(
             x=d_shelly["logged_at_rounded"],
-            y=d_shelly["temperature_internal"],
-            name="internal",
-        ),
-        row=1,
-        col=1,
-    )
-    f.add_trace(
-        plotly.graph_objs.Scatter(
-            x=d_shelly["logged_at_rounded"],
-            y=d_shelly["temperature_external"],
-            name="external",
-        ),
-        row=1,
-        col=1,
-    )
-    f.add_trace(
-        plotly.graph_objs.Scatter(
-            x=d_shelly["logged_at_rounded"],
-            y=d_shelly["temperature_difference"],
+            y=d_shelly["temperature_diff_avg"],
             name="difference",
         ),
         row=2,
@@ -77,7 +80,7 @@ def plot(d_shelly, d_gas):
     f.add_trace(
         plotly.graph_objs.Scatter(
             x=d_shelly["logged_at_rounded"],
-            y=[d_shelly["temperature_difference"].mean()] * len(d_shelly),
+            y=[d_shelly["temperature_diff_avg"].mean()] * len(d_shelly),
             name="difference",
             line=dict(dash="dot"),
         ),
@@ -126,13 +129,30 @@ def plot(d_shelly, d_gas):
     return f
 
 
-def main(shelly_log, meter_log):
-    d_shelly = load_data(shelly_log)
-    d_shelly = pivot_on_time(d_shelly)
+def get_env_device_ids(conf_path, home):
+    conf = from_yaml(conf_path)
+    env_ids = {}
+    for env in conf["shelly"]:
+        if env["home"] == "External":
+            env_ids["external"] = env["device_ids"]
+        if env["home"] == home:
+            env_ids["internal"] = env["device_ids"]
+    return env_ids
+
+
+def main(conf_path, home, shelly_log, meter_log):
+    env_ids = get_env_device_ids(conf_path, home)
+    d_shelly = load_data(shelly_log, env_ids)
+    d_shelly = pivot_on_time(d_shelly, env_ids)
     d_shelly = add_degree_time_columns(d_shelly)
     d_gas = load_gas_data(meter_log)
     plot(d_shelly, d_gas)
 
 
 if __name__ == "__main__":
-    main(shelly_log=sys.argv[1], meter_log=sys.argv[2])
+    main(
+        conf_path=sys.argv[1],
+        home=sys.argv[2],
+        shelly_log=sys.argv[3],
+        meter_log=sys.argv[4],
+    )

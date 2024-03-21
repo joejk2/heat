@@ -3,11 +3,13 @@ from typing import Any, Dict
 import pandas as pd
 
 
-def load_data(shelly_log):
+def load_data(shelly_log, env_ids):
     data = []
     with open(shelly_log) as file:
         for line in file:
             values = line.strip().split(",")
+            if values[0] not in env_ids["external"] + env_ids["internal"]:
+                continue
             if len(values) == 5:
                 values.append("nan")  # battery
             data.append(values)
@@ -39,20 +41,53 @@ def load_data(shelly_log):
     return df
 
 
-def pivot_on_time(d):
+def pivot_on_time(d, env_ids):
     # When generalised, will be a pivot on `time` and `home_id`
     d["logged_at_rounded"] = d["logged_at"].dt.floor("20T")
-    d_internal = d[d["device_id"] == "701878"]
-    d_external = d[d["device_id"] == "caaeb0"]
-    d_wide = pd.merge(
-        d_internal,
-        d_external,
-        on="logged_at_rounded",
-        how="inner",
-        suffixes=["_internal", "_external"],
+
+    def column_mappings(env, id):
+        return {
+            "temperature": f"temperature_{env}_{id}",
+            "humidity": f"humidity_{env}_{id}",
+            "battery": f"battery_{env}_{id}",
+        }
+
+    external_id = env_ids["external"][0]
+    external_col_map = column_mappings("ext", env_ids["external"][0])
+    d_wide = d[d["device_id"] == external_id].copy()[
+        [
+            "device_id",
+            "measured_at",
+            "logged_at",
+            "logged_at_rounded",
+            "battery",
+            "temperature",
+            "humidity",
+        ]
+    ]
+    d_wide.rename(
+        columns=external_col_map,
+        inplace=True,
     )
-    d_wide["temperature_difference"] = (
-        d_wide["temperature_internal"] - d_wide["temperature_external"]
+
+    temperature_int_columns = []
+    for internal_id in env_ids["internal"]:
+        internal_col_map = column_mappings("int", internal_id)
+        temperature_int_columns.append(internal_col_map["temperature"])
+
+        d_internal = d[d["device_id"] == internal_id][
+            ["logged_at_rounded", "battery", "temperature", "humidity"]
+        ].copy()
+        d_internal.rename(
+            columns=internal_col_map,
+            inplace=True,
+        )
+
+        d_wide = pd.merge(d_wide, d_internal, on="logged_at_rounded", how="outer")
+
+    d_wide["temperature_int_avg"] = d_wide[temperature_int_columns].mean(axis=1)
+    d_wide["temperature_diff_avg"] = (
+        d_wide["temperature_int_avg"] - d_wide[external_col_map["temperature"]]
     )
     return d_wide
 
