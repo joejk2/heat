@@ -1,21 +1,21 @@
+import datetime
 import sys
 
 import pandas as pd
 import plotly.graph_objs
 import plotly.subplots
+
 from heat.common.utils import from_yaml
 from heat.etl.shelly.utils import load_data, pivot_on_time
 
 
-def load_gas_data(meter_log):
+def load_smart_meter_data(meter_log):
     # TODO: move function which shouldn't really be in etl/shelly
     return pd.read_csv(
         meter_log,
+        skiprows=1,
+        usecols=[0, 1],
         names=["measured_at", "reading"],
-        dtype=dict(
-            measured_at=str,
-            reading=float,
-        ),
         parse_dates=["measured_at"],
     )
 
@@ -129,6 +129,39 @@ def plot(d_shelly, d_gas):
     return f
 
 
+def write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetime):
+    d_energy = d_gas.merge(
+        d_electricity, on="measured_at", how="outer", suffixes=("_gas", "_electricity")
+    )
+    d_shelly_resampled = d_shelly.resample("30T", on="logged_at").last()
+    d_combined = d_shelly_resampled.merge(
+        d_energy.set_index("measured_at"),
+        left_index=True,
+        right_index=True,
+        how="inner",
+    )
+    d_combined = (
+        d_combined[
+            (d_combined.index >= start_datetime) & (d_combined.index <= end_datetime)
+        ]
+        .reset_index()
+        .rename(columns={"index": "datetime"})
+    )
+    col_map = dict(
+        datetime="Date/time (UTC)",
+        reading_gas="Gas consumption (kWh)",
+        reading_electricity="Electricity consumption (kWh)",
+        temperature_int_701878="Internal temperature 1 (°C)",
+        temperature_int_edbc1f="Internal temperature 2 (°C)",
+        humidity_int_701878="Humidity 1 (°C)",
+        humidity_int_edbc1f="Humidity 2 (°C)",
+        temperature_ext_caaeb0="External temperature (°C)",
+    )
+    d_combined = d_combined[col_map.keys()].rename(columns=col_map).drop_duplicates()
+    d_combined.to_csv("/tmp/shelly.csv", index=False)
+    return d_combined
+
+
 def get_env_device_ids(conf_path, home):
     conf = from_yaml(conf_path)
     env_ids = {}
@@ -140,13 +173,23 @@ def get_env_device_ids(conf_path, home):
     return env_ids
 
 
-def main(conf_path, home, shelly_log, meter_log):
+def main(
+    conf_path,
+    home,
+    shelly_log,
+    gas_meter_log,
+    electricity_meter_log,
+    start_datetime,
+    end_datetime,
+):
     env_ids = get_env_device_ids(conf_path, home)
     d_shelly = load_data(shelly_log, env_ids)
     d_shelly = pivot_on_time(d_shelly, env_ids)
     d_shelly = add_degree_time_columns(d_shelly)
-    d_gas = load_gas_data(meter_log)
+    d_gas = load_smart_meter_data(gas_meter_log)
+    d_electricity = load_smart_meter_data(electricity_meter_log)
     plot(d_shelly, d_gas)
+    write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetime)
 
 
 if __name__ == "__main__":
@@ -154,5 +197,8 @@ if __name__ == "__main__":
         conf_path=sys.argv[1],
         home=sys.argv[2],
         shelly_log=sys.argv[3],
-        meter_log=sys.argv[4],
+        gas_meter_log=sys.argv[4],
+        electricity_meter_log=sys.argv[5],
+        start_datetime=datetime.datetime.strptime(sys.argv[6], "%Y-%m-%d %H:%M:%S"),
+        end_datetime=datetime.datetime.strptime(sys.argv[7], "%Y-%m-%d %H:%M:%S"),
     )
