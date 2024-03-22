@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 import plotly.graph_objs
 import plotly.subplots
+
 from heat.common.utils import from_yaml
 from heat.etl.shelly.utils import load_data, pivot_on_time
 
@@ -32,13 +33,16 @@ def add_degree_time_columns(d):
     return d_ext
 
 
-def columns(d, prefix, exclude=None):
+def columns(d, prefix, exclude=None, counter=False):
     cols = [
         col
         for col in d.columns
         if (col.startswith(prefix) and (exclude is None or col not in exclude))
     ]
-    return zip(range(len(cols)), cols)
+    if counter:
+        return zip(range(len(cols)), cols)
+    else:
+        return cols
 
 
 def plot(d_shelly, d_gas):
@@ -55,7 +59,7 @@ def plot(d_shelly, d_gas):
         shared_xaxes=True,
         specs=[[{"secondary_y": True}]] * 3,
     )
-    for _counter, col in columns(d_shelly, "temperature_int_", ["temperature_int_avg"]):
+    for col in columns(d_shelly, "temperature_int_", ["temperature_int_avg"]):
         f.add_trace(
             plotly.graph_objs.Scatter(
                 x=d_shelly["logged_at_rounded"],
@@ -65,7 +69,7 @@ def plot(d_shelly, d_gas):
             row=1,
             col=1,
         )
-    for _counter, col in columns(d_shelly, "temperature_ext_"):
+    for col in columns(d_shelly, "temperature_ext_"):
         f.add_trace(
             plotly.graph_objs.Scatter(
                 x=d_shelly["logged_at_rounded"],
@@ -136,10 +140,23 @@ def plot(d_shelly, d_gas):
     return f
 
 
+def non_nan_rows(d, col_prefix):
+    first = None
+    last = None
+    for col in columns(d, col_prefix):
+        rows = d[d[col].notna()]
+        if first is None or (not rows.empty and rows.index[0] < first):
+            first = rows.index[0]
+        if last is None or (not rows.empty and rows.index[-1] > last):
+            last = rows.index[-1]
+    return d.copy(deep=True).iloc[first : last + 1]
+
+
 def write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetime):
     d_energy = d_gas.merge(
         d_electricity, on="measured_at", how="outer", suffixes=("_gas", "_electricity")
     )
+    d_shelly = non_nan_rows(d_shelly, "temperature_int_")
     d_shelly_resampled = d_shelly.resample("30T", on="logged_at").last()
     d_combined = d_shelly_resampled.merge(
         d_energy.set_index("measured_at"),
@@ -149,7 +166,7 @@ def write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetim
     )
     d_combined = (
         d_combined[
-            (d_combined.index >= start_datetime) & (d_combined.index <= end_datetime)
+            (d_combined.index >= start_datetime) & (d_combined.index < end_datetime)
         ]
         .reset_index()
         .rename(columns={"index": "datetime"})
@@ -159,9 +176,11 @@ def write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetim
         reading_gas="Gas consumption (kWh)",
         reading_electricity="Electricity consumption (kWh)",
     )
-    for _counter, col in columns(d_shelly, "temperature_int_", ["temperature_int_avg"]):
-        col_map[col] = f"Internal temperature {_counter + 1} (°C)"
-        col_map[col.replace("temperature", "humidity")] = f"Humidity {_counter + 1} (%)"
+    for counter, col in columns(
+        d_shelly, "temperature_int_", ["temperature_int_avg"], counter=True
+    ):
+        col_map[col] = f"Internal temperature {counter + 1} (°C)"
+        col_map[col.replace("temperature", "humidity")] = f"Humidity {counter + 1} (%)"
     d_combined = d_combined[col_map.keys()].rename(columns=col_map).drop_duplicates()
     d_combined.to_csv("/tmp/shelly.csv", index=False)
     return d_combined
