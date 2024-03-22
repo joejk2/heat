@@ -4,7 +4,6 @@ import sys
 import pandas as pd
 import plotly.graph_objs
 import plotly.subplots
-
 from heat.common.utils import from_yaml
 from heat.etl.shelly.utils import load_data, pivot_on_time
 
@@ -33,7 +32,17 @@ def add_degree_time_columns(d):
     return d_ext
 
 
+def columns(d, prefix, exclude=None):
+    cols = [
+        col
+        for col in d.columns
+        if (col.startswith(prefix) and (exclude is None or col not in exclude))
+    ]
+    return zip(range(len(cols)), cols)
+
+
 def plot(d_shelly, d_gas):
+
     f = plotly.subplots.make_subplots(
         rows=3,
         cols=1,
@@ -46,9 +55,7 @@ def plot(d_shelly, d_gas):
         shared_xaxes=True,
         specs=[[{"secondary_y": True}]] * 3,
     )
-    for col in d_shelly.filter(regex=r"^temperature_int_"):
-        if col == "temperature_int_avg":
-            continue
+    for _counter, col in columns(d_shelly, "temperature_int_", ["temperature_int_avg"]):
         f.add_trace(
             plotly.graph_objs.Scatter(
                 x=d_shelly["logged_at_rounded"],
@@ -58,7 +65,7 @@ def plot(d_shelly, d_gas):
             row=1,
             col=1,
         )
-    for col in d_shelly.filter(regex=r"^temperature_ext_"):
+    for _counter, col in columns(d_shelly, "temperature_ext_"):
         f.add_trace(
             plotly.graph_objs.Scatter(
                 x=d_shelly["logged_at_rounded"],
@@ -151,12 +158,10 @@ def write_bts_format(d_shelly, d_gas, d_electricity, start_datetime, end_datetim
         datetime="Date/time (UTC)",
         reading_gas="Gas consumption (kWh)",
         reading_electricity="Electricity consumption (kWh)",
-        temperature_int_701878="Internal temperature 1 (°C)",
-        temperature_int_edbc1f="Internal temperature 2 (°C)",
-        humidity_int_701878="Humidity 1 (°C)",
-        humidity_int_edbc1f="Humidity 2 (°C)",
-        temperature_ext_caaeb0="External temperature (°C)",
     )
+    for _counter, col in columns(d_shelly, "temperature_int_", ["temperature_int_avg"]):
+        col_map[col] = f"Internal temperature {_counter + 1} (°C)"
+        col_map[col.replace("temperature", "humidity")] = f"Humidity {_counter + 1} (%)"
     d_combined = d_combined[col_map.keys()].rename(columns=col_map).drop_duplicates()
     d_combined.to_csv("/tmp/shelly.csv", index=False)
     return d_combined
